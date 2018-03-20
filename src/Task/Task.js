@@ -1,8 +1,8 @@
-import React, { Component } from 'react';
+import React, { PureComponent } from 'react';
 import TaskEditForm from '../TaskEditForm/TaskEditForm';
 import './Task.css';
 
-class Task extends Component {
+class Task extends PureComponent {
 
     constructor(props) {
 

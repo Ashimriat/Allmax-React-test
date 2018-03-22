@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import './TaskEditForm.css';
+import DateManager from '../classes/DateManager';
 
 class TaskEditForm extends Component {
 
@@ -10,7 +11,7 @@ class TaskEditForm extends Component {
             id: props.taskInfo.id,
             title: props.taskInfo.title,
             description: props.taskInfo.description,
-            importance: props.taskInfo.importance,
+            importance: props.taskInfo.importance ? props.taskInfo.importance : 'Обычная',
             deadlineDateDay: props.taskInfo.deadlineDate.substring(0,10),
             deadlineDateTime: props.taskInfo.deadlineDate.substring(11,16),
             completionDateDay: props.taskInfo.completionDate.substring(0,10),
@@ -19,13 +20,12 @@ class TaskEditForm extends Component {
             isCreated: props.taskInfo.isCreated
         }
 
+        this.dateManager = new DateManager();
+
         this.saveTaskData = this.saveTaskData.bind(this);
         this.resetTaskData = this.resetTaskData.bind(this);
-        this.getFullDateData = this.getFullDateData.bind(this);
         this.handleInputChange = this.handleInputChange.bind(this);
-        this.convertTimezone = props.timezonesConverter;
-
-    }
+    };
 
     handleInputChange(event) {
         const target = event.target;
@@ -34,7 +34,7 @@ class TaskEditForm extends Component {
         this.setState({
             [name]: value
         });      
-    }
+    };
 
     resetTaskData(event){
         event.preventDefault();
@@ -54,39 +54,6 @@ class TaskEditForm extends Component {
         );
     };
 
-    convertTimezone(date) {
-        let timeZonesDifference = -(date.getTimezoneOffset());
-        let hoursDifference = timeZonesDifference / 60;
-        let minutesDifference = timeZonesDifference % 60;
-        let zString = null;
-        if (hoursDifference < 10) hoursDifference = '0' + hoursDifference; 
-        if (minutesDifference < 10) minutesDifference = '0' + minutesDifference; 
-        if (timeZonesDifference > 0) {
-            zString = '+' + hoursDifference + ':' + minutesDifference;
-        } else {
-            zString = '-' + hoursDifference + ':' + minutesDifference;
-        } 
-        return zString;
-    }
-
-    getFullDateData(day,time){
-        let dayString = day;
-        let timeString = time;
-        let todayDate = new Date();
-        let zString = this.convertTimezone(todayDate);
-        let dateString = '';
-        if (dayString === '' && timeString === '') {
-            return dateString;
-        } 
-        if (dayString === '' && timeString !== '') {
-            let defaultDateDay = todayDate.toISOString();
-            dayString = defaultDateDay.substr(0, 10);
-        }
-        if (timeString === '') timeString = 'HH:mm';
-        dateString = dayString + 'T' + timeString + ':00.000' + zString;
-        return dateString;
-    }
-
     saveTaskData(event){
 
         event.stopPropagation();
@@ -96,16 +63,15 @@ class TaskEditForm extends Component {
             title: this.state.title,
             description: this.state.description,
             importance: this.state.importance,
-            deadlineDate: this.getFullDateData(this.state.deadlineDateDay, this.state.deadlineDateTime),
-            completionDate: this.getFullDateData(this.state.completionDateDay, this.state.completionDateTime),
-            isCreated: true
+            deadlineDate: this.dateManager.getFullLocalDateISO(this.state.deadlineDateDay, this.state.deadlineDateTime),
+            completionDate: this.dateManager.getFullLocalDateISO(this.state.completionDateDay, this.state.completionDateTime),
+            isCreated: true,
+            isEditing: false
         };
-
+        updatedTaskData.isCompleted = updatedTaskData.completionDate ? true : false;
         this.props.saveDataChanges(updatedTaskData);
-
-    }
+    };
     
-
 	render() {
         const completedDateField = this.state.isCreated && (
                 <label>
@@ -114,6 +80,7 @@ class TaskEditForm extends Component {
                     <input className="form-element form-completed__time" type="time" name="completionDateTime" value={this.state.completionDateTime} onChange={this.handleInputChange}/>
                 </label>
         );
+        const cancelCreationButton = !this.state.isCreated && <button onClick={() => {this.props.cancelTaskCreation(this.state.id)}} className="form-btn btn-cancel">Отменить создание</button>
         return (
             <form onSubmit={this.saveTaskData} className="task-editing-form">
                 <ul className="form-list">
@@ -152,11 +119,12 @@ class TaskEditForm extends Component {
                     <li className="form-field form-buttons">
                         <button onClick={this.resetTaskData} className="form-btn btn-reset">Сбросить данные</button>
                         <button type='submit' className="form-btn btn-save">Сохранить задачу</button>
+                        {cancelCreationButton}
                     </li>
                 </ul>
             </form>
         );
-    }
+    };
 
 }
 

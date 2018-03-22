@@ -1,6 +1,7 @@
 import React, { PureComponent } from 'react';
 import TaskEditForm from '../TaskEditForm/TaskEditForm';
 import './Task.css';
+import DateManager from '../classes/DateManager';
 
 class Task extends PureComponent {
 
@@ -15,28 +16,24 @@ class Task extends PureComponent {
         };
 
         this.deadlineDate = props.taskInfo.deadlineDate;
-        this.deadlineDateString = '';
+        this.deadlineDateDisplayString = '';
         this.completionDate = props.taskInfo.completionDate;
-        this.completionDateString = '';
+        this.completionDateDisplayString = '';
+        this.dateManager = new DateManager();
 
         this.isOutdated = this.isOutdated.bind(this);
-        this.generateTaskBody = this.generateTaskBody.bind(this);
-        this.changeTaskDisplay = this.changeTaskDisplay.bind(this);
+        this.changeTaskInfoDisplay = this.changeTaskInfoDisplay.bind(this);
         this.changeTaskComplete = this.changeTaskComplete.bind(this);
         this.updateTaskData = this.updateTaskData.bind(this);
         this.editTask = this.editTask.bind(this);
-        this.defineDatesStrings = this.defineDatesStrings.bind(this);
-        this.getFullLocalDateData = this.getFullLocalDateData.bind(this);
-        this.getGMTZone = this.getGMTZone.bind(this);
-        this.getLocalDate = this.getLocalDate.bind(this);
-
-    }
+        this.defineDatesDisplay = this.defineDatesDisplay.bind(this);
+        this.generateTaskBody = this.generateTaskBody.bind(this);
+    };
     
     isOutdated() {
-        let currentDate = this.getLocalDate();
+        let currentDate = this.dateManager.getLocalDate();
         let deadlineDateString = this.deadlineDate;
         if (this.deadlineDate === '') {
-            console.log("Дедлайн не задан");
             return false;
         }
         if (~deadlineDateString.indexOf('HH:mm')) {
@@ -45,70 +42,24 @@ class Task extends PureComponent {
         let deadlineDate = new Date(Date.parse(deadlineDateString));
         
         if (!this.state.isCompleted && ((currentDate - deadlineDate) > 0)) {
-            console.log("Дедлайн просрочен");
             return true;
         }
-        console.log("Дедлайн не просрочен");
         return false;
     };
 
-    changeTaskDisplay() {
+    changeTaskInfoDisplay() {
         this.setState(prevState => {return {isOpen: !prevState.isOpen}});
-    }
-
-    getGMTZone(date) {
-        let timeZonesDifference = -(date.getTimezoneOffset());
-        let hoursDifference = timeZonesDifference / 60;
-        let minutesDifference = timeZonesDifference % 60;
-        let zString = null;
-        if (hoursDifference < 10) hoursDifference = '0' + hoursDifference; 
-        if (minutesDifference < 10) minutesDifference = '0' + minutesDifference; 
-        if (timeZonesDifference > 0) {
-            zString = '+' + hoursDifference + ':' + minutesDifference;
-        } else {
-            zString = '-' + hoursDifference + ':' + minutesDifference;
-        } 
-        return zString;
-    }
-
-    getFullLocalDateData(day, time){
-        let todayDate = new Date();
-        let dayString = day;
-        let timeString = time;
-        let zString = this.getGMTZone(todayDate);
-        let dateString = dayString + 'T' + timeString + ':00.000' + zString;
-        return dateString;
-    }
-
-    getLocalDate(){
-        let todayDate = new Date();
-        let timeZonesDifference = -(todayDate.getTimezoneOffset());
-        let hoursDifference = timeZonesDifference / 60;
-        let minutesDifference = timeZonesDifference % 60;
-        let todayDateUTCHours = todayDate.getHours();
-        let todayDateUTCMinutes = todayDate.getMinutes();
-        let localDateHours = todayDateUTCHours;
-        let localDateMinutes = todayDateUTCMinutes;
-        if (timeZonesDifference > 0) {
-            localDateHours += hoursDifference;
-            localDateMinutes += minutesDifference;
-        } else {
-            localDateHours -= hoursDifference;
-            localDateMinutes -= minutesDifference;
-        }
-        let todayDateLocal = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate(), localDateHours, localDateMinutes);
-        return todayDateLocal;
-    }
+    };
 
     changeTaskComplete() {
 
         if (this.state.isCompleted) {
             this.completionDate = '';
         } else {
-            let todayDateLocal = this.getLocalDate();
+            let todayDateLocal = this.dateManager.getLocalDate();
             let temporaryDateDay = todayDateLocal.toISOString().substr(0,10);
             let temporaryDateTime = todayDateLocal.toISOString().substr(11, 5);
-            this.completionDate = this.getFullLocalDateData(temporaryDateDay, temporaryDateTime);
+            this.completionDate = this.dateManager.getFullLocalDateISO(temporaryDateDay, temporaryDateTime);
         }
         let updatedTaskData = {
             id: this.props.taskInfo.id,
@@ -123,37 +74,23 @@ class Task extends PureComponent {
         }
         this.setState(prevState => {return {isCompleted: !prevState.isCompleted}});
         this.props.updateTask(updatedTaskData);
-    }
+    };
 
     updateTaskData(newTaskData) {
-
-        const isTaskCompleted = (newTaskData.completionDate) ? true : false;
-        let updatedTaskData = {
-            id: newTaskData.id,
-            title: newTaskData.title,
-            description: newTaskData.description,
-            importance: newTaskData.importance,
-            deadlineDate: newTaskData.deadlineDate,
-            completionDate: newTaskData.completionDate,
-            isCompleted: isTaskCompleted, 
-            isEditing: false,
-            isCreated: true
-        }; 
-        this.deadlineDate = updatedTaskData.deadlineDate;
-        this.completionDate = updatedTaskData.completionDate;
+        this.deadlineDate = newTaskData.deadlineDate;
+        this.completionDate = newTaskData.completionDate;
         this.setState({
-            isCompleted: isTaskCompleted,
+            isCompleted: newTaskData.isCompleted,
             isEditing: false
         });
-        this.props.updateTask(updatedTaskData);
-    }
+        this.props.updateTask(newTaskData);
+    };
 
     editTask(){
         this.setState({isEditing: true});
     };
 
-    defineDatesStrings() {
-
+    defineDatesDisplay() {
         let dates = [this.deadlineDate, this.completionDate];
         let datesStrings = [];
         
@@ -167,32 +104,31 @@ class Task extends PureComponent {
                 datesStrings[i] = new Date(Date.parse(dates[i])).toLocaleString("ru", {year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: 'numeric'});
             }
         }
-
-        this.deadlineDateString = datesStrings[0];
-        this.completionDateString = datesStrings[1];
-    }
+        this.deadlineDateDisplayString = datesStrings[0];
+        this.completionDateDisplayString = datesStrings[1];
+    };
 
     generateTaskBody() {
-        this.defineDatesStrings();
+        this.defineDatesDisplay();
         let titleClasses =  this.isOutdated() ? "title outdated": "title";
         titleClasses = this.state.isCompleted ? "title completed" : titleClasses;
         const taskInfoBlock = this.state.isOpen && (
             <main className="task-info">
                 <section className="details">
                     <p className="importance"><span className="point-title">Важность задачи:</span> {this.props.taskInfo.importance}</p>
-                    <p className="description"><span className="point-title">Описание задачи:</span> {this.props.taskInfo.description}</p>
+                    <p className="description"><span className="point-title">Описание задачи:</span> {this.props.taskInfo.description ? this.props.taskInfo.description : "Описание отсутствует"}</p>
                 </section>
                 <section className="dates">
-                    <p className="deadline"><span className="point-title">Дедлайн:</span> {this.deadlineDateString}</p>
-                    <p className="completion"><span className="point-title">Дата выполнения:</span> {this.completionDateString}</p>
+                    <p className="deadline"><span className="point-title">Дедлайн:</span> {this.deadlineDateDisplayString}</p>
+                    <p className="completion"><span className="point-title">Дата выполнения:</span> {this.completionDateDisplayString}</p>
                 </section>
             </main>);
-        const taskEditForm = <TaskEditForm taskInfo={this.props.taskInfo} saveDataChanges={this.updateTaskData} timezonesConverter={this.getGMTZone}/>
+        const taskEditForm = <TaskEditForm taskInfo={this.props.taskInfo} saveDataChanges={this.updateTaskData} cancelTaskCreation={this.props.deleteTask}/>
         const taskBody = ( 
             <div className="task-item">
                 <header className="task-header">
                     <input type="checkbox" name="completed" className="task-complete" checked={this.state.isCompleted} onChange={this.changeTaskComplete}/>
-                    <h2 className={titleClasses} onClick={this.changeTaskDisplay}>{this.props.taskInfo.title}</h2>
+                    <h2 className={titleClasses} onClick={this.changeTaskInfoDisplay}>{this.props.taskInfo.title}</h2>
                 </header>
                 {taskInfoBlock}
                 <footer className="task-footer">
@@ -205,7 +141,7 @@ class Task extends PureComponent {
         } else {
             return taskBody;          
         }   
-    }
+    };
 
     render() {
         const taskBodyToRender = this.generateTaskBody();
@@ -214,7 +150,7 @@ class Task extends PureComponent {
 				{taskBodyToRender}
 		    </div>
         );
-    }
+    };
 
 }
 
